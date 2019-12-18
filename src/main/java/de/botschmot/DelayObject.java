@@ -1,17 +1,22 @@
 package de.botschmot;
 
+import de.botschmot.exceptions.NotReadyException;
+
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
- * Object that wraps another object and "releses" it after a given amount of time.
+ * Object that wraps another object and "releases" it after a given amount of time.
  *
  * @param <T> Type of Object you want to wrap
  */
-public class DelayObject<T> {
+public final class DelayObject<T> {
 
     /**
      * Potential scheduler to call the callbacks
@@ -38,27 +43,27 @@ public class DelayObject<T> {
     }
 
     /**
-     * Wrapps an object to be released at a later time
+     * Wraps an object to be released at a later time
      *
      * @param content Content that should be wrapped
      * @param delay   Nanoseconds that should pass till the release
      * @param <T>     Type of object to be wrapped
      * @return new {@link DelayObject} that wrapps content
      */
-    public static <T> DelayObject<T> delayObject(T content, long delay) {
-        return new DelayObject<T>(content, LocalDateTime.now().plusNanos(delay));
+    public static <T> DelayObject<T> of(T content, long delay) {
+        return new DelayObject<>(content, LocalDateTime.now().plusNanos(delay));
     }
 
     /**
-     * Wrapps an object to be released at a later time
+     * Wraps an object to be released at a later time
      *
      * @param content Content that should be wrapped
      * @param time    Time it should be released
      * @param <T>     Type of object to be wrapped
      * @return new {@link DelayObject} that wrapps content
      */
-    public static <T> DelayObject<T> delayObject(T content, LocalDateTime time) {
-        return new DelayObject<T>(content, time);
+    public static <T> DelayObject<T> of(T content, LocalDateTime time) {
+        return new DelayObject<>(content, time);
     }
 
     /**
@@ -66,7 +71,7 @@ public class DelayObject<T> {
      *
      * @return Time the object is ready
      */
-    public LocalDateTime ReadyAt() {
+    public LocalDateTime readyAt() {
         return this.time;
     }
 
@@ -79,27 +84,92 @@ public class DelayObject<T> {
     public T get() throws NotReadyException {
         if (isReady())
             return this.content;
-        throw new NotReadyException(this.ReadyAt());
+        throw new NotReadyException(this.readyAt());
     }
 
     /**
-     * Determines if the object is ready to be released
+     * Determines if the content is ready to be released
      *
      * @return {@link Boolean#TRUE} if object is ready else {@link Boolean#FALSE}
      */
     public boolean isReady() {
-        return ReadyAt().isBefore(LocalDateTime.now());
+        return readyAt().isBefore(LocalDateTime.now());
     }
 
     /**
-     * Returns the wrapped object if it is ready. Uses {@link DelayObject#isReady()}. Does not throw an exception in contrast to {@link DelayObject#get()}
+     * If the content is ready, performs the given action with the content,
+     * otherwise does nothing.
      *
-     * @param defaultObject Object to be returned if not Ready
-     * @param <K>           Type of default object
-     * @return Wrapped object if it is ready
+     * @param action the action to be performed, if the content is ready
+     * @throws NullPointerException if content is ready and the given action is
+     *                              {@code null}
      */
-    public <K extends T> T get(K defaultObject) {
-        return isReady() ? this.content : defaultObject;
+    public void ifReady(Consumer<? super T> action) {
+        if (isReady()) action.accept(get());
+    }
+
+    /**
+     * If a value is present, performs the given action with the value,
+     * otherwise performs the given empty-based action.
+     *
+     * @param action      the action to be performed, if the content is ready
+     * @param emptyAction the empty-based action to be performed, if the content is not ready
+     * @throws NullPointerException if content is ready and the given action is
+     *                              {@code null}, or the content is not ready and the given empty-based
+     *                              action is {@code null}.
+     */
+    public void ifReadyOrElse(Consumer<? super T> action, Runnable emptyAction) {
+        if (isReady()) {
+            action.accept(get());
+        } else {
+            emptyAction.run();
+        }
+    }
+
+    /**
+     * If content is ready, returns the value, otherwise returns
+     * {@code other}.
+     *
+     * @param other the value to be returned, if the content is not ready.
+     *              May be {@code null}.
+     * @return the value, if ready, otherwise {@code other}
+     */
+    public T orElse(T other) {
+        return isReady() ? this.content : other;
+    }
+
+    /**
+     * If content is ready, returns the value, otherwise returns the result
+     * produced by the supplying function.
+     *
+     * @param supplier the supplying function that produces a value to be returned
+     * @return the value, if ready, otherwise the result produced by the
+     * supplying function
+     * @throws NullPointerException if content is ready and the supplying
+     *                              function is {@code null}
+     */
+    public T orElseGet(Supplier<? extends T> supplier) {
+        return isReady() ? get() : supplier.get();
+    }
+
+    /**
+     * If the content is ready, returns the value, otherwise throws an exception
+     * produced by the exception supplying function.
+     *
+     * @param <X>               Type of the exception to be thrown
+     * @param exceptionSupplier the supplying function that produces an
+     *                          exception to be thrown
+     * @return the value, if ready
+     * @throws X                    if content is not ready
+     * @throws NullPointerException if content is not ready and the exception
+     *                              supplying function is {@code null}
+     * @apiNote A method reference to the exception constructor with an empty argument
+     * list can be used as the supplier. For example,
+     * {@code IllegalStateException::new}
+     */
+    public <X extends Throwable> T orElseThrow(Supplier<? extends X> exceptionSupplier) throws X {
+        if (isReady()) return get();
+        throw exceptionSupplier.get();
     }
 
     /**
@@ -124,35 +194,22 @@ public class DelayObject<T> {
         scheduler.schedule(callback, ChronoUnit.MILLIS.between(LocalDateTime.now(), this.time), TimeUnit.MILLISECONDS);
     }
 
-    /**
-     * Exception that gets fired when a not ready object is expected
-     */
-    public static class NotReadyException extends RuntimeException {
-
-        /**
-         * Time the faulty called object will be ready
-         */
-        private final LocalDateTime time;
-
-        /**
-         * Creates the Exception with a nice message that is understandable
-         *
-         * @param time Time the faulty called object will be ready
-         */
-        private NotReadyException(LocalDateTime time) {
-            super(String.format("Your object is not ready yet. It will be ready in %ss (%s)", ChronoUnit.SECONDS.between(LocalDateTime.now(), time), time));
-            this.time = time;
-        }
-
-        /**
-         * Get the time the object that was called faulty will be released
-         *
-         * @return Time the faulty called object will be ready
-         */
-        public LocalDateTime readyTime() {
-            return this.time;
-        }
-
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DelayObject<?> that = (DelayObject<?>) o;
+        return Objects.equals(content, that.content) &&
+                Objects.equals(time, that.time);
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(content, time);
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Content: [%s] with ready time [%s]", content, time);
+    }
 }
