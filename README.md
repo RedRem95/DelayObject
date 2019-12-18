@@ -9,7 +9,8 @@ Just get the source or clone from the github maven repo, i guess.
 
 ## Authors
 
-* **RedRem** - *All the work* - [RedRem95](https://github.com/RedRem95)
+* **RedRem** - *Initial Code* - [RedRem95](https://github.com/RedRem95)
+* **JoKrus** - *Nice Code* - [JoKrus](https://github.com/JoKrus)
 
 ## License
 
