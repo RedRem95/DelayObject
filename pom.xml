@@ -6,7 +6,7 @@
 
     <groupId>de.botschmot</groupId>
     <artifactId>DelayObject</artifactId>
-    <version>0.5</version>
+    <version>0.5.1</version>
     <build>
         <plugins>
             <plugin>
