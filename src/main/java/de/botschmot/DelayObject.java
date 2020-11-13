@@ -4,6 +4,7 @@ import de.botschmot.exceptions.NotReadyException;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -48,7 +49,7 @@ public final class DelayObject<T> {
      * @param content Content that should be wrapped
      * @param delay   Nanoseconds that should pass till the release
      * @param <T>     Type of object to be wrapped
-     * @return new {@link DelayObject} that wrapps content
+     * @return new {@link DelayObject} that wraps content
      */
     public static <T> DelayObject<T> of(T content, long delay) {
         return new DelayObject<>(content, LocalDateTime.now().plusNanos(delay));
@@ -58,9 +59,22 @@ public final class DelayObject<T> {
      * Wraps an object to be released at a later time
      *
      * @param content Content that should be wrapped
+     * @param amount  Amount of {@see TemporalUnit} that should be added
+     * @param unit    Unit that defines the amount
+     * @param <T>     Type of object to be wrapped
+     * @return new {@link DelayObject} that wraps content
+     */
+    public static <T> DelayObject<T> of(T content, long amount, TemporalUnit unit) {
+        return new DelayObject<>(content, LocalDateTime.now().plus(amount, unit));
+    }
+
+    /**
+     * Wraps an object to be released at a later time
+     *
+     * @param content Content that should be wrapped
      * @param time    Time it should be released
      * @param <T>     Type of object to be wrapped
-     * @return new {@link DelayObject} that wrapps content
+     * @return new {@link DelayObject} that wraps content
      */
     public static <T> DelayObject<T> of(T content, LocalDateTime time) {
         return new DelayObject<>(content, time);
